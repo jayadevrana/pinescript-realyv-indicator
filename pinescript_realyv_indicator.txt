@@ -1,0 +1,58 @@
+//@version=5
+indicator(title="Realyv Indicator", shorttitle="Realyv Indicator", overlay=true)
+
+// Define constants and hide inputs
+useRes = true
+intRes = 3
+len = 8
+
+// Define the resolution based on input and timeframe
+resMultiplier = useRes ? intRes : 1
+stratRes = timeframe.isdaily ? str.tostring(timeframe.multiplier * resMultiplier, "###D") :
+           timeframe.isweekly ? str.tostring(timeframe.multiplier * resMultiplier, "###W") :
+           timeframe.ismonthly ? str.tostring(timeframe.multiplier * resMultiplier, "###M") :
+           timeframe.isintraday ? str.tostring(timeframe.multiplier * resMultiplier, "####") : '60'
+
+// Base functions
+reso(exp, use, res) => use ? request.security(syminfo.tickerid, res, exp, gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_on) : exp
+
+// Calculate SMMA for open prices
+src_open = open
+smma_open = ta.sma(src_open, len)
+smma_open := na(smma_open[1]) ? smma_open : (smma_open[1] * (len - 1) + src_open) / len
+
+// Calculate SMMA for close prices
+src_close = close
+smma_close = ta.sma(src_close, len)
+smma_close := na(smma_close[1]) ? smma_close : (smma_close[1] * (len - 1) + src_close) / len
+
+// Get Alternate resolution Series
+smma_openAlt = reso(smma_open, useRes, stratRes)
+smma_closeAlt = reso(smma_close, useRes, stratRes)
+
+// Alert conditions
+xlong = ta.crossover(smma_closeAlt, smma_openAlt)
+alertcondition(xlong, title="xlong signal", message="xlong Alert")
+xshort = ta.crossunder(smma_closeAlt, smma_openAlt)
+alertcondition(xshort, title="xshort signal", message="xshort Alert")
+longCond = xlong
+alertcondition(longCond, title="Go LONG signal", message="go long")
+shortCond = xshort
+alertcondition(shortCond, title="Go SHORT", message="Go Short")
+
+// Bar coloring
+var color candleColor = na
+if (xlong) 
+    candleColor := #00FF00FF
+else if (xshort) 
+    candleColor := #FF0000FF
+
+barcolor(candleColor)
+
+// Buy and Sell signals
+buySignal = ta.crossover(smma_closeAlt, smma_openAlt)
+sellSignal = ta.crossunder(smma_closeAlt, smma_openAlt)
+
+// Plot Buy and Sell signals
+plotshape(series=buySignal, title="Buy Signal", location=location.belowbar, color=#00FF00FF, style=shape.labelup, text="BUY", textcolor = color.white)
+plotshape(series=sellSignal, title="Sell Signal", location=location.abovebar, color=#FF0000FF, style=shape.labeldown, text="SELL", textcolor = color.white)
